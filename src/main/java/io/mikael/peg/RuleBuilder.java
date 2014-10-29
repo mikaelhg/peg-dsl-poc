@@ -5,6 +5,9 @@ import io.mikael.peg.rules.CharacterLoHiRule;
 
 import java.util.Arrays;
 
+/**
+ * Prototype.
+ */
 public class RuleBuilder {
 
     public static void main(final String ... args) {

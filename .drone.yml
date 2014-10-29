@@ -1,4 +1,4 @@
-image: bradrydzewski/java:openjdk8
+image: bradrydzewski/java:oraclejdk8
 env:
   - M2_REPO=/tmp/m2repo
 script:

@@ -1,10 +1,15 @@
 package io.mikael.peg;
 
+import io.mikael.peg.rules.CharacterConstantRule;
+import io.mikael.peg.rules.CharacterLoHiRule;
+
 import java.util.Arrays;
 
 public class RuleBuilder {
 
-    public static void main(String[] args) {
+    public static void main(final String ... args) {
+
+        System.out.printf("%s/%s%n", null, null);
 
         System.out.printf("character('a', 'h').match(\"far\") = <%s>%n",
                 character('a', 'h').match("far"));
@@ -29,81 +34,39 @@ public class RuleBuilder {
 
     }
 
-    @FunctionalInterface
-    public static interface Rule {
-
-        default public Match match(String input) {
-            return match(input.toCharArray(), 0);
-        }
-
-        public Match match(char[] chars, int i);
-
+    private static MatchNode match(final CharSequence content) {
+        return new MatchNode(true, content.length(), content);
     }
 
-    public static class Match {
-        public final int length;
-        public final CharSequence content;
-        public final boolean matched;
-        public Match(final boolean matched, final int length, final CharSequence content) {
-            this.length = length;
-            this.content = content;
-            this.matched = matched;
-        }
-        @Override public String toString() {
-            return String.format("Match(%s, %s, %s)", length, content, matched);
-        }
+    private static MatchNode match(final char[] content) {
+        return new MatchNode(true, content.length, new StringBuilder().append(content));
     }
 
-    public static class NoMatch extends Match {
-        public NoMatch() { super(false, 0, null); }
-        @Override public String toString() { return "NoMatch()"; }
+    private static MatchNode match(final char content) {
+        return new MatchNode(true, 1, Character.toString(content));
     }
 
-    private static Match match(final CharSequence content) {
-        return new Match(true, content.length(), content);
-    }
-
-    private static Match match(final char[] content) {
-        return new Match(true, content.length, new StringBuilder().append(content));
-    }
-
-    private static Match match(final char content) {
-        return new Match(true, 1, Character.toString(content));
-    }
-
-    private static Match match(final Match ... matches) {
-        if (Arrays.stream(matches).anyMatch(m -> !m.matched)) {
+    private static MatchNode match(final MatchNode... matchNodes) {
+        if (Arrays.stream(matchNodes).anyMatch(m -> !m.matched)) {
             return noMatch();
         }
         final StringBuilder sb = new StringBuilder();
-        for (final Match m : matches) {
+        for (final MatchNode m : matchNodes) {
             sb.append(m.content);
         }
         return match(sb);
     }
 
-    private static Match noMatch() {
-        return new NoMatch();
+    private static MatchNode noMatch() {
+        return new NoMatchNode();
     }
 
     public static Rule character(final char low, final char high) {
-        return (chars, i) -> {
-            if (i < chars.length && chars[i] >= low && chars[i] <= high) {
-                return match(chars[i]);
-            } else {
-                return noMatch();
-            }
-        };
+        return new CharacterLoHiRule(low, high);
     }
 
     public static Rule character(final char constant) {
-        return (chars, i) -> {
-            if (i < chars.length && chars[i] == constant) {
-                return match(chars[i]);
-            } else {
-                return noMatch();
-            }
-        };
+        return new CharacterConstantRule(constant);
     }
 
     public static Rule string(final String constant) {
@@ -126,9 +89,9 @@ public class RuleBuilder {
         return (chars, i) -> {
             int j = i;
             for (final Rule rule : rules) {
-                final Match match = rule.match(chars, j);
-                if (match.matched) {
-                    j += match.length;
+                final MatchNode matchNode = rule.match(chars, j);
+                if (matchNode.matched) {
+                    j += matchNode.length;
                 } else {
                     return noMatch();
                 }
@@ -139,11 +102,11 @@ public class RuleBuilder {
 
     public static Rule and(final Rule a, final Rule b) {
         return (chars, i) -> {
-            final Match am = a.match(chars, i);
+            final MatchNode am = a.match(chars, i);
             if (!am.matched) {
                 return noMatch();
             }
-            final Match bm = b.match(chars, i + am.length);
+            final MatchNode bm = b.match(chars, i + am.length);
             if (!bm.matched) {
                 return noMatch();
             }
@@ -154,7 +117,7 @@ public class RuleBuilder {
     public static Rule or(final Rule... choices) {
         return (chars, i) -> {
             for (final Rule m : choices) {
-                final Match n = m.match(chars, i);
+                final MatchNode n = m.match(chars, i);
                 if (n.matched) {
                     return n;
                 }
@@ -166,18 +129,18 @@ public class RuleBuilder {
     // !! how do we get the character / string for a non-match
     public static Rule not(final Rule rule) {
         return (chars, i) -> {
-            final Match match = rule.match(chars, i);
-            if (match.matched) {
+            final MatchNode matchNode = rule.match(chars, i);
+            if (matchNode.matched) {
                 return noMatch();
             } else {
-                return match(match.content);
+                return match(matchNode.content);
             }
         };
     }
 
     public static Rule zeroOrMore(final Rule m) {
         return (chars, i) -> {
-            Match n;
+            MatchNode n;
             int k = i;
             while ((n = m.match(chars, k)).matched) {
                 k += n.length;
@@ -188,7 +151,7 @@ public class RuleBuilder {
 
     public static Rule oneOrMore(final Rule m) {
         return (chars, i) -> {
-            Match n;
+            MatchNode n;
             int k = 0, matches = 0;
             while ((n = m.match(chars, k)).matched) {
                 k += n.length;

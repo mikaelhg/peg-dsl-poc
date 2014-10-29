@@ -2,6 +2,6 @@ image: bradrydzewski/java:oraclejdk8
 env:
   - M2_REPO=/tmp/m2repo
 script:
-  - mvn -B clean compile package install
+  - mvn -B clean compile package
 cache:
   - /tmp/m2repo
